@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YesButFirst - Ask a Question!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: default;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .header {
+            padding: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            padding: 15px 20px;
+            border-radius: 15px;
+            max-width: 70%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background: #667eea;
+            color: white;
+        }
+
+        .ai-message {
+            align-self: flex-start;
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .system-message {
+            align-self: center;
+            background: #ffd93d;
+            color: #333;
+            text-align: center;
+            max-width: 90%;
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .question-input {
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .question-input:focus {
+            border-color: #764ba2;
+        }
+
+        .send-btn {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .example-questions {
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .example-btn {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading:nth-child(1) { animation-delay: -0.32s; }
+        .loading:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .unlock-btn {
+            padding: 20px 60px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 20px auto;
+            display: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .emergency-exit {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <h1>Yes, But First...</h1>
+            <p>Ask a good question to unlock your computer!</p>
+        </div>
+        
+        <div class="chat-area" id="chatArea">
+            <div class="message system-message">
+                <p>👋 Hi! I'm here to help you learn something new today. What are you curious about?</p>
+            </div>
+            
+            <div class="example-questions" id="exampleQuestions">
+                <p style="margin-bottom: 10px;">Need ideas? Try one of these:</p>
+                <button class="example-btn" onclick="useExample('Why is the sky blue?')">Why is the sky blue?</button>
+                <button class="example-btn" onclick="useExample('How does the internet work?')">How does the internet work?</button>
+                <button class="example-btn" onclick="useExample('What causes rainbows?')">What causes rainbows?</button>
+            </div>
+        </div>
+        
+        <div class="input-area">
+            <input 
+                type="text" 
+                class="question-input" 
+                id="questionInput" 
+                placeholder="Type your question here..."
+                autofocus
+            >
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">Ask</button>
+        </div>
+        
+        <button class="unlock-btn" id="unlockBtn" style="display: none;">
+            🎉 Unlock Computer
+        </button>
+    </div>
+    
+    <div class="emergency-exit">Emergency Exit: Ctrl+Shift+Q</div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        let conversation = [];
+        let currentStage = 'question'; // 'question', 'answer', 'understanding', 'complete'
+        let attempts = 0;
+        
+        // Handle enter key
+        document.getElementById('questionInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        function useExample(question) {
+            document.getElementById('questionInput').value = question;
+            document.getElementById('exampleQuestions').style.display = 'none';
+            sendMessage();
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('questionInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to chat
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Disable input while processing
+            setInputEnabled(false);
+            
+            // Show typing indicator
+            const typingDiv = showTyping();
+            
+            try {
+                // Send to main process for AI processing
+                const response = await ipcRenderer.invoke('process-message', {
+                    message,
+                    stage: currentStage,
+                    conversation
+                });
+                
+                // Remove typing indicator
+                typingDiv.remove();
+                
+                // Add AI response
+                addMessage(response.message, 'ai');
+                
+                // Update conversation state
+                conversation.push({ user: message, ai: response.message });
+                
+                // Handle stage progression
+                if (response.stage === 'complete') {
+                    currentStage = 'complete';
+                    showUnlockButton();
+                } else if (response.stage === 'understanding') {
+                    currentStage = 'understanding';
+                    input.placeholder = "Tell me what you learned...";
+                } else if (response.retry) {
+                    attempts++;
+                    if (attempts >= 3) {
+                        addMessage("That's okay! Learning takes time. You can unlock your computer now.", 'system');
+                        showUnlockButton();
+                    }
+                }
+                
+                setInputEnabled(true);
+                input.focus();
+                
+            } catch (error) {
+                typingDiv.remove();
+                addMessage("Oops! Something went wrong. Try again or press Ctrl+Shift+Q to exit.", 'system');
+                setInputEnabled(true);
+            }
+        }
+        
+        function addMessage(text, type) {
+            const chatArea = document.getElementById('chatArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.innerHTML = `<p>${text}</p>`;
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+        
+        function showTyping() {
+            const chatArea = document.getElementById('chatArea');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message ai-message';
+            typingDiv.innerHTML = '<span class="loading"></span><span class="loading"></span><span class="loading"></span>';
+            chatArea.appendChild(typingDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+            return typingDiv;
+        }
+        
+        function setInputEnabled(enabled) {
+            document.getElementById('questionInput').disabled = !enabled;
+            document.getElementById('sendBtn').disabled = !enabled;
+        }
+        
+        function showUnlockButton() {
+            document.getElementById('unlockBtn').style.display = 'block';
+            document.getElementById('unlockBtn').onclick = () => {
+                const btn = document.getElementById('unlockBtn');
+                
+                // Visual feedback
+                btn.textContent = 'Unlocking...';
+                btn.style.backgroundColor = '#45a049';
+                btn.disabled = true;
+                
+                console.log('Unlock button clicked! Sending IPC message...');
+                
+                try {
+                    ipcRenderer.send('unlock-app');
+                    console.log('IPC message sent successfully');
+                    
+                    // Additional visual feedback
+                    btn.textContent = 'Success! Closing...';
+                    btn.style.backgroundColor = '#4CAF50';
+                } catch (error) {
+                    console.error('Error sending unlock IPC:', error);
+                    btn.textContent = 'Error - Press Ctrl+Shift+Q';
+                    btn.style.backgroundColor = '#f44336';
+                    btn.disabled = false;
+                }
+            };
+            setInputEnabled(false);
+        }
+        
+        // Prevent right-click
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            return false;
+        });
+    </script>
+</body>
+</html>

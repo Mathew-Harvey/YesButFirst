@@ -1,0 +1,52 @@
+{
+  "name": "yesbut-first",
+  "version": "1.0.0",
+  "description": "YesButFirst - Curiosity before computing",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start-ai": "electron main-with-ai.js",
+    "start-safe": "electron main-simple.js",
+    "dev": "electron . --dev",
+    "test-ai": "node test-ai.js",
+    "setup": "node setup-ai.js",
+    "costs": "node cost-calculator.js",
+    "build-win": "electron-builder --win",
+    "build-mac": "electron-builder --mac",
+    "dist": "electron-builder"
+  },
+  "keywords": ["education", "parental-control", "curiosity", "ai"],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  },
+  "build": {
+    "appId": "com.yesbut.first",
+    "productName": "YesButFirst",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico",
+      "requestedExecutionLevel": "highestAvailable"
+    },
+    "mac": {
+      "category": "public.app-category.education",
+      "icon": "icon.icns"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": false
+    }
+  }
+}
