@@ -43,6 +43,20 @@ module.exports = {
         young: { min: 6, max: 9 },
         middle: { min: 10, max: 13 },
         teen: { min: 14, max: 17 }
+      },
+      
+      // Response length settings
+      responseLength: {
+        first: {
+          young: { maxTokens: 80, instruction: "Answer in 1-2 SHORT sentences. Be direct and simple." },
+          middle: { maxTokens: 100, instruction: "Answer in 1-2 sentences. Be clear and direct." },
+          teen: { maxTokens: 120, instruction: "Answer in 2-3 sentences max. Be direct and conversational." }
+        },
+        continued: {
+          young: { maxTokens: 150, instruction: "Give a bit more detail in 2-3 sentences." },
+          middle: { maxTokens: 180, instruction: "Explain more in 3-4 sentences." },
+          teen: { maxTokens: 200, instruction: "Give more detail in 3-5 sentences." }
+        }
       }
     },
     

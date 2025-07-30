@@ -18,56 +18,121 @@ class AIService {
   }
 
   // System prompt that defines the AI's behavior
-  getSystemPrompt() {
-    return `You are an enthusiastic, friendly AI tutor for YesButFirst, an app that encourages curiosity in children and teens before they use their computer.
+  getSystemPrompt(lengthInstruction = "Keep answers concise (2-3 paragraphs max)", ageGroup = 'teen', childInterests = []) {
+    const ageProfiles = {
+      young: { // 5-8 years
+        voice: "Be playful, enthusiastic, and use simple words",
+        style: "Short sentences, emojis, fun tone 🌟",
+        engagement: "Use 'wow!', 'cool!', make it feel like an adventure",
+        examples: "Talk about animals, colors, simple science, favorite things",
+        questions: "What do you think happens when...? / Can you imagine if...?"
+      },
+      middle: { // 9-12 years  
+        voice: "Be an engaging storyteller and knowledge explorer",
+        style: "Moderate complexity, use analogies and real examples",
+        engagement: "Share 'Did you know?' facts, connect to their world",
+        examples: "Space, inventions, nature mysteries, how things work",
+        questions: "How do you think this connects to...? / What would happen if we changed...?"
+      },
+      teen: { // 13-17 years
+        voice: "Be a thoughtful peer having an intelligent discussion", 
+        style: "Sophisticated language, respect their maturity",
+        engagement: "Real-world connections, thought experiments",
+        examples: "Technology, society, future possibilities, complex systems",
+        questions: "What implications does this have for...? / How might this challenge...?"
+      }
+    };
 
-Your role:
-1. Answer the child's question in an engaging, age-appropriate way
-2. Use simple language but don't talk down to them
-3. Make learning fun and interesting
-4. After answering, ask ONE follow-up question to check their understanding
-5. Be encouraging and positive
+    const profile = ageProfiles[ageGroup] || ageProfiles.teen;
+    
+    // Generate interest context
+    const interestContext = childInterests.length > 0 
+      ? `Child's interests: ${childInterests.slice(0, 3).join(', ')}. Connect to these when relevant. `
+      : '';
 
-Important rules:
-- Keep answers concise (2-3 paragraphs max)
-- Use examples and analogies kids can relate to
-- If asked inappropriate questions, redirect to something educational
-- End with a simple question that tests if they understood the key concept
-- Never discuss anything inappropriate for children
+    return `You are an engaging conversationalist helping a ${ageGroup} child (age ${ageGroup === 'young' ? '5-8' : ageGroup === 'middle' ? '9-12' : '13-17'}) learn through curiosity.
 
-Remember: The goal is to spark curiosity and ensure understanding, not just provide information.`;
+${interestContext}
+
+YOUR PERSONALITY:
+- ${profile.voice}
+- ${profile.style}
+- ${profile.engagement}
+
+CONVERSATION GOALS:
+1. Answer their question in an age-appropriate, engaging way
+2. Spark curiosity with interesting connections or facts
+3. End with ONE clear follow-up question that:
+   - Relates directly to what you just explained
+   - Has a reasonably clear answer (not too abstract)
+   - Encourages them to think and respond
+   - Shows you're building on the conversation
+
+EXAMPLES OF GOOD FOLLOW-UP QUESTIONS:
+- Young: "What do you think would happen if animals could build spaceships too?"
+- Middle: "How do you think this technology could help us explore even further?"
+- Teen: "What challenges do you think we'd face trying to travel between stars?"
+
+CRITICAL RULES:
+- ${lengthInstruction}
+- Be enthusiastic and positive
+- Use age-appropriate vocabulary
+- Make learning feel like discovery, not a lesson
+- Your follow-up question should flow naturally from your explanation
+
+Remember: The child will answer your follow-up question next, so make it engaging and connected to what you just discussed!`;
+  }
+
+  getQuestionGuidelines(ageGroup) {
+    const guidelines = {
+      young: `- "What would happen if..." type questions
+- Connect to their experiences: "Where else have you seen..."
+- Imagination-based: "What do you think it would be like if..."
+- Simple cause-effect: "Why do you think..."`,
+      
+      middle: `- "How do you think this connects to..." 
+- Process questions: "What would happen if we changed..."
+- Comparison questions: "How is this similar to..."
+- "What patterns do you notice..."`,
+      
+      teen: `- "What implications does this have for..."
+- "How might this challenge the idea that..."
+- "What assumptions are we making about..."
+- "How might someone disagree with this..."`
+    };
+    
+    return guidelines[ageGroup] || guidelines.teen;
   }
 
   // Evaluate if the child understood the answer
-  async evaluateUnderstanding(question, answer, childResponse) {
+  async evaluateUnderstanding(question, answer, childResponse, fullConversationHistory = []) {
     // Add timeout to prevent hanging
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('AI evaluation timeout')), 10000); // 10 second timeout
     });
 
     try {
-      const prompt = `Based on this educational exchange, determine if the child demonstrated understanding.
-
-Original Question: "${question}"
-AI Answer Summary: "${answer}"
-Child's Response: "${childResponse}"
-
-Evaluate if the child's response shows they understood the main concept. Be generous and focus on the core understanding, not perfect recall.
-
-Respond with a JSON object:
-{
-  "understood": true/false,
-  "feedback": "Brief encouraging message",
-  "suggestion": "Optional: what to clarify if not understood"
-}`;
+      // Extract the actual follow-up question from the AI's response for better context
+      const extractedQuestion = this.extractFollowUpQuestionFromResponse(answer);
+      
+      // Build conversation context from history
+      let conversationContext = '';
+      if (fullConversationHistory.length > 0) {
+        conversationContext = '\n\nFULL CONVERSATION HISTORY:\n' + 
+          fullConversationHistory.map((turn, i) => 
+            `${i + 1}. Child: "${turn.user}"\n   AI: "${turn.ai}"`
+          ).join('\n') + '\n';
+      }
+      
+      const prompt = `EVALUATION CONTEXT:\nOriginal question: "${question}"\nYour full response: "${answer}"\nYour follow-up question was: "${extractedQuestion || 'Could not extract question'}"\nChild's response: "${childResponse}"${conversationContext}\n\nTASK: Evaluate if the child engaged meaningfully with your follow-up question.\n\nIMPORTANT: The child's response should be evaluated as an answer to YOUR FOLLOW-UP QUESTION, not as a new question.\n\nEXAMPLE: If you asked "What would you ask plants?" and child responds "do humans move really fast", that's a PERFECT answer (they're saying they'd ask plants about how humans move fast).\n\nALWAYS be generous - if it's even remotely related, say yes.`;
 
       const apiCall = axios.post(this.apiUrl, {
         model: this.model,
         messages: [
-          { role: 'system', content: 'You are an educational assessment AI. Respond only with valid JSON.' },
+          { role: 'system', content: 'ALWAYS say understood:true unless complete gibberish. ANY attempt = success! Keep feedback to 1-2 words. Respond only with valid JSON.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.3, // Lower temperature for more consistent evaluation
+        temperature: 0.3, // Lower temperature for consistent evaluation
         max_tokens: 150
       }, {
         headers: {
@@ -92,45 +157,135 @@ Respond with a JSON object:
       // Default to allowing unlock on any error (timeout, network, parsing, etc.)
       return {
         understood: true,
-        feedback: "Great job! You can unlock your computer now.",
+        feedback: "Good effort! You can unlock your computer now.",
         suggestion: null
       };
     }
   }
 
+  // Helper to determine age group (updated for new ranges)
+  getAgeGroup(childAge) {
+    if (!childAge) return 'teen'; // Default
+    
+    const age = parseInt(childAge);
+    if (age >= 5 && age <= 8) return 'young';
+    if (age >= 9 && age <= 12) return 'middle';
+    if (age >= 13 && age <= 17) return 'teen';
+    
+    // Handle edge cases
+    if (age < 5) return 'young';
+    if (age > 17) return 'teen';
+    
+    return 'teen'; // Final fallback
+  }
+  
+  // Helper to extract follow-up question from AI response
+  extractFollowUpQuestionFromResponse(response) {
+    if (!response) return null;
+    
+    // Look for question at the end of response
+    const questionMatch = response.match(/([^.!]*\?)\s*$/);
+    if (questionMatch) return questionMatch[1].trim();
+    
+    // Look for any question in the response
+    const allQuestions = response.match(/[^.!?]*\?/g);
+    if (allQuestions && allQuestions.length > 0) {
+      return allQuestions[allQuestions.length - 1].trim();
+    }
+    
+    return null;
+  }
+
+  // Check if a question is nonsensical
+  isNonsensicalQuestion(question) {
+    if (!question || question.trim().length < 3) return true; // Shorter length
+
+    const nonsensePatterns = [
+      /^[^a-zA-Z]*$/,           // No letters
+      /^(.)\1{3,}$/,            // Repeated characters
+      /^[a-z]{5,}$/i,           // Shorter random letters (was 15)
+      /^[\d\s]+$/,              // Numbers and spaces
+      /^[!@#$%^&*()]+$/,        // Special chars
+      /^(asdf|qwer|zxcv|poiuy|lkjh|test|random|blah|foo)/i, // More patterns
+      /^(aaa|bbb|ccc|ddd|eee|fff|ggg|hhh|iii|jjj|kkk|lll|mmm|nnn|ooo|ppp|qqq|rrr|sss|ttt|uuu|vvv|www|xxx|yyy|zzz)/i, // Letter repetitions
+      /^test$/i,
+      /^(hi|hello|hey|yo|sup)$/i, // Greetings
+      /^let me in$/i, // Specific from bug
+      /^this is broken$/i // Specific from bug
+    ];
+
+    return nonsensePatterns.some(pattern => pattern.test(question.trim()));
+  }
+
   // Answer a child's question
-  async answerQuestion(question, childAge = null) {
+  async answerQuestion(question, childAge = null, isFirstResponse = true, conversationLength = 0, childInterests = [], fullConversationHistory = []) {
     try {
+      // Check for nonsensical questions first
+      if (this.isNonsensicalQuestion(question)) {
+        return {
+          answer: "Please ask a real question to unlock your computer! 🤔 Try something like: How do airplanes fly? Why is the sky blue? How do computers work?",
+          usage: { totalTokens: 0, promptTokens: 0, completionTokens: 0 },
+          isNonsense: true
+        };
+      }
+      
       const ageContext = childAge ? `The child is ${childAge} years old. ` : '';
       
-      const response = await axios.post(this.apiUrl, {
-        model: this.model,
-        messages: [
-          { role: 'system', content: this.getSystemPrompt() },
-          { role: 'user', content: `${ageContext}Question: ${question}` }
-        ],
-        temperature: this.temperature,
-        max_tokens: this.maxTokens
-      }, {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Determine response length settings
+      const ageGroup = this.getAgeGroup(childAge);
+      const aiConfig = require('./ai-config');
+      const responseType = isFirstResponse ? 'first' : 'continued';
+      const lengthSettings = aiConfig.behavior.responseLength[responseType][ageGroup];
+      
+      // Build conversation context
+      let conversationContext = '';
+      if (fullConversationHistory.length > 0) {
+        conversationContext = 'FULL CONVERSATION HISTORY:\n' + 
+          fullConversationHistory.map((turn, i) => 
+            `${i + 1}. Child: "${turn.user}"\n   AI: "${turn.ai}"`
+          ).join('\n') + '\n\n';
+      }
 
-      const answer = response.data.choices[0].message.content;
-      const usage = response.data.usage;
-      
-      // Track usage
-      this.updateUsage(usage);
-      
-      return {
-        answer,
-        usage: {
-          tokens: usage.total_tokens,
-          estimatedCost: this.calculateCost(usage)
+      const messages = [
+        { role: 'system', content: this.getSystemPrompt(lengthSettings.instruction, ageGroup, childInterests) },
+        { role: 'user', content: `${conversationContext}${ageContext}Question: ${question}` }
+      ];
+
+      // Implement retry logic
+      const maxRetries = 3;
+      let lastError;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await axios.post(this.apiUrl, {
+            model: this.model,
+            messages: messages,
+            temperature: this.temperature,
+            max_tokens: lengthSettings.maxTokens
+          }, {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const answer = response.data.choices[0].message.content.trim();
+
+          return {
+            answer,
+            usage: {
+              totalTokens: response.data.usage.total_tokens,
+              promptTokens: response.data.usage.prompt_tokens,
+              completionTokens: response.data.usage.completion_tokens,
+              estimatedCost: this.calculateCost(response.data.usage)
+            }
+          };
+        } catch (error) {
+          lastError = error;
+          console.error(`AI request failed (attempt ${attempt}/${maxRetries}):`, error.message);
+          if (attempt === maxRetries) throw lastError;
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
         }
-      };
+      }
     } catch (error) {
       console.error('Error getting answer:', error);
       throw new Error('Failed to get answer from AI');
@@ -202,7 +357,7 @@ class GeminiService extends AIService {
   }
 
   // Override the answerQuestion method for Gemini's API format
-  async answerQuestion(question, childAge = null) {
+  async answerQuestion(question, childAge = null, isFirstResponse = true, conversationLength = 0) {
     const maxRetries = 3;
     let lastError;
     
@@ -210,15 +365,21 @@ class GeminiService extends AIService {
       try {
         const ageContext = childAge ? `The child is ${childAge} years old. ` : '';
         
+        // Determine response length settings
+        const ageGroup = this.getAgeGroup(childAge);
+        const aiConfig = require('./ai-config');
+        const responseType = isFirstResponse ? 'first' : 'continued';
+        const lengthSettings = aiConfig.behavior.responseLength[responseType][ageGroup];
+        
         const response = await axios.post(`${this.apiUrl}?key=${this.apiKey}`, {
           contents: [{
             parts: [{
-              text: `${this.getSystemPrompt()}\n\n${ageContext}Question: ${question}`
+              text: `${this.getSystemPrompt(lengthSettings.instruction, ageGroup)}\n\n${ageContext}Question: ${question}`
             }]
           }],
           generationConfig: {
             temperature: this.temperature,
-            maxOutputTokens: this.maxTokens
+            maxOutputTokens: lengthSettings.maxTokens
           }
         }, {
           headers: {
